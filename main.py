@@ -10,40 +10,8 @@ from numba import njit, cuda
 # Image directory
 image_dir = "images"
 
-def get_ssd_disparity_map(left_image, right_image, window_radius):
-    num_rows, num_cols = left_image.shape[:2]
-    window_dimensions = 1 + 2 * window_radius
-    max_disparity = int(0.15 * num_cols)
-
-    left = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY).astype(int)
-    left = cv2.copyMakeBorder(left, window_radius, window_radius, window_radius, window_radius, cv2.BORDER_REFLECT_101)
-    right = cv2.cvtColor(right_image, cv2.COLOR_BGR2GRAY).astype(int)
-    right = cv2.copyMakeBorder(right, window_radius, window_radius, window_radius, window_radius, cv2.BORDER_REFLECT_101)
-    disparity_map = np.zeros((num_rows, num_cols))
-
-    # Determine best correspondence for each pixel
-    for row in range(num_rows):
-        for col in range(num_cols):
-            template_window = left[row:row + window_dimensions, col:col + window_dimensions]
-            min_ssd = float('inf')
-            disparity = 0
-
-            # Search only along horizontal epipolar line
-            for epipolar_col in range(max(0, col - max_disparity), col):
-                proposed_window = right[row:row + window_dimensions, epipolar_col:epipolar_col + window_dimensions]
-                ssd = np.einsum('ij,ij', template_window - proposed_window, template_window - proposed_window)
-        
-                if ssd < min_ssd:
-                    min_ssd = ssd
-                    disparity = np.abs(col - epipolar_col)
-
-            # Set disparity between pixel and its correspondent
-            disparity_map[row][col] = disparity
-
-    return disparity_map
-
 @njit(target_backend='cuda')
-def fast_get_ssd_disparity_map(left_image_padded, right_image_padded, num_rows, num_cols, window_radius):
+def get_ssd_disparity_map(left_image_padded, right_image_padded, num_rows, num_cols, window_radius):
     window_dimensions = 1 + 2 * window_radius
     max_disparity = int(0.15 * num_cols)
     disparity_map = np.zeros((num_rows, num_cols))
@@ -96,15 +64,6 @@ if __name__ == '__main__':
         # Calculate SSD disparity map
         window_radius = 4
 
-        # ssd_disp_map = get_ssd_disparity_map(left_image, right_image, window_radius)
-
-        # # Save SSD disparity map
-        # cv2.imwrite(os.path.join(image_dir, scene_name, '_ssd_disp.png'), ssd_disp_map)
-
-
-
-
-
         # Preprocess image
         num_rows, num_cols = left_image.shape[:2]
         left_image = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY).astype(int)
@@ -112,21 +71,16 @@ if __name__ == '__main__':
         right_image = cv2.cvtColor(right_image, cv2.COLOR_BGR2GRAY).astype(int)
         right_image_padded = cv2.copyMakeBorder(right_image, window_radius, window_radius, window_radius, window_radius, cv2.BORDER_REFLECT_101)
 
-        ssd_disp_map = fast_get_ssd_disparity_map(left_image_padded, right_image_padded, num_rows, num_cols, window_radius)
+        ssd_disp_map = get_ssd_disparity_map(left_image_padded, right_image_padded, num_rows, num_cols, window_radius)
         cv2.imwrite(os.path.join(image_dir, scene_name, 'ssd_disp.png'), ssd_disp_map)
 
-
-
     if run_gc:
+        # Images have been modified; read again
         left_image = cv2.imread(os.path.join(image_dir, scene_name, 'left.png'))
         right_image = cv2.imread(os.path.join(image_dir, scene_name, 'right.png'))
-
 
         # Calculate graph cut disparity map
         gc_disp_map_left = get_gc_disparity_map(left_image, right_image)
 
         # Save graph cut disparity map
         cv2.imwrite(os.path.join(image_dir, scene_name, 'gc_disp.png'), gc_disp_map_left)
-
-        plt.imshow(gc_disp_map_left, cmap="jet")
-        plt.show()
