@@ -7,14 +7,13 @@ import sys
 from matplotlib import pyplot as plt
 from numba import njit, cuda
 
-# I/O directories
-input_dir = "images"
-output_dir = "./"
+# Image directory
+image_dir = "images"
 
 def get_ssd_disparity_map(left_image, right_image, window_radius):
     num_rows, num_cols = left_image.shape[:2]
     window_dimensions = 1 + 2 * window_radius
-    max_disparity = int(0.1 * num_cols)
+    max_disparity = int(0.15 * num_cols)
 
     left = cv2.cvtColor(left_image, cv2.COLOR_BGR2GRAY).astype(int)
     left = cv2.copyMakeBorder(left, window_radius, window_radius, window_radius, window_radius, cv2.BORDER_REFLECT_101)
@@ -46,7 +45,7 @@ def get_ssd_disparity_map(left_image, right_image, window_radius):
 @njit(target_backend='cuda')
 def fast_get_ssd_disparity_map(left_image_padded, right_image_padded, num_rows, num_cols, window_radius):
     window_dimensions = 1 + 2 * window_radius
-    max_disparity = int(0.1 * num_cols)
+    max_disparity = int(0.15 * num_cols)
     disparity_map = np.zeros((num_rows, num_cols))
 
     left = left_image_padded
@@ -86,28 +85,21 @@ if __name__ == '__main__':
 
     # Read scene name and associated images
     scene_name = sys.argv[1]
-    left_image = cv2.imread(os.path.join(input_dir, scene_name, 'view1.png'))
-    right_image = cv2.imread(os.path.join(input_dir, scene_name, 'view5.png'))
-
-    # Resize images (so runtimes fall within a reasonable range)
+    left_image = cv2.imread(os.path.join(image_dir, scene_name, 'left.png'))
+    right_image = cv2.imread(os.path.join(image_dir, scene_name, 'right.png'))
     num_rows, num_cols = left_image.shape[:2]
-    resized_now_rows = 250      # Restrict all images to have 200 rows
-    resized_num_cols = int((resized_now_rows / num_rows) * num_cols)
-    resized_left_image = cv2.resize(left_image, (resized_num_cols, resized_now_rows))
-    resized_right_image = cv2.resize(right_image, (resized_num_cols, resized_now_rows))
 
-    run_ssd = False
+    run_ssd = True
     run_gc = True
 
     if run_ssd:
         # Calculate SSD disparity map
         window_radius = 4
-        # ssd_disp_map = get_ssd_disparity_map(resized_left_image, resized_right_image, window_radius)
-        # ssd_disp_map = cv2.normalize(ssd_disp_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+        # ssd_disp_map = get_ssd_disparity_map(left_image, right_image, window_radius)
 
         # # Save SSD disparity map
-        # cv2.imwrite(os.path.join(output_dir, scene_name + '_ssd_disp.png'), ssd_disp_map)
-
+        # cv2.imwrite(os.path.join(image_dir, scene_name, '_ssd_disp.png'), ssd_disp_map)
 
 
 
@@ -121,23 +113,20 @@ if __name__ == '__main__':
         right_image_padded = cv2.copyMakeBorder(right_image, window_radius, window_radius, window_radius, window_radius, cv2.BORDER_REFLECT_101)
 
         ssd_disp_map = fast_get_ssd_disparity_map(left_image_padded, right_image_padded, num_rows, num_cols, window_radius)
-        ssd_disp_map = cv2.normalize(ssd_disp_map, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        cv2.imwrite(os.path.join(output_dir, scene_name + '_ssd_disp.png'), ssd_disp_map)
-
+        cv2.imwrite(os.path.join(image_dir, scene_name, 'ssd_disp.png'), ssd_disp_map)
 
 
 
     if run_gc:
+        left_image = cv2.imread(os.path.join(image_dir, scene_name, 'left.png'))
+        right_image = cv2.imread(os.path.join(image_dir, scene_name, 'right.png'))
+
+
         # Calculate graph cut disparity map
-        gc_disp_map_left = get_gc_disparity_map(resized_left_image, resized_right_image)
-        l = gc_disp_map_left
-        gc_disp_map_left = cv2.normalize(gc_disp_map_left, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        gc_disp_map_left = get_gc_disparity_map(left_image, right_image)
 
         # Save graph cut disparity map
-        cv2.imwrite(os.path.join(output_dir, scene_name + '_gc_disp.png'), gc_disp_map_left)
+        cv2.imwrite(os.path.join(image_dir, scene_name, 'gc_disp.png'), gc_disp_map_left)
 
         plt.imshow(gc_disp_map_left, cmap="jet")
-        plt.show()
-
-        plt.imshow(l, cmap="jet")
         plt.show()

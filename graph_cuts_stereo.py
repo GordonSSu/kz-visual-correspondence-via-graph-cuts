@@ -242,7 +242,6 @@ class GraphCutsStereo:
         # Update state if energy decreases
         if new_energy < self.curr_energy:
             self.curr_energy = new_energy
-            print(new_energy)
             self.update_d_left_right(g, alpha)
             return True
 
