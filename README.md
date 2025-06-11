@@ -1,7 +1,10 @@
-# stereo-correspondence-project
+# kz-visual-correspondence-via-graph-cuts
 
-Gordon Su \
-gsu37@gatech.edu
+Original paper: *Computing Visual Correspondence with
+Occlusions via Graph Cuts* (https://www.cs.cornell.edu/rdz/Papers/KZ-ICCV01-tr.pdf)
+
+Follow-up writeup: *Kolmogorov and Zabih’s Graph Cuts Stereo Matching
+Algorithm* (https://www.ipol.im/pub/art/2014/97/article.pdf)
 
 ### To generate disparity maps for each of the three test images, run the following 3 commands (may take up to 30 minutes)
 ```
